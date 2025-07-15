@@ -66,6 +66,9 @@ app.post("/users", (req, res) => {
         user.parse(req.body);
         usage.user.success++;
         req.body.createdAt = new Date().toString();
+        req.body.name = req.body.name.trim();
+        req.body.surname = req.body.surname.trim();
+        req.body.email = req.body.email.trim();
         users.push(req.body);
         usage.user.creates++;
         res.send({ message: "Created user successfully!" });
