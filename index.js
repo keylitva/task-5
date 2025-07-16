@@ -125,7 +125,24 @@ app.post("/createbankaccount", (req, res) => {
   }
 });
 
-// The DELETE endpoint was invalid and has been removed.
+app.delete("/deletebankaccount/:id", (req, res) => {
+  try {
+    const accountIndex = BankoSaskaitos.findIndex(
+      (s) => s.id === Number(req.params.id)
+    );
+    if (accountIndex === -1) {
+      usage.user.fail++;
+      return res.status(404).send({ message: "Account not found!" });
+    }
+    BankoSaskaitos.splice(accountIndex, 1);
+    usage.user.delete++;
+    return res.send({ message: "Account deleted successfully!" });
+  } catch (error) {
+    return res
+      .status(404)
+      .send({ message: "Account deletion failed!", error: error });
+  }
+});
 
 app.listen(3000, () => {
   console.log("The create user api has started on port 3000!");
