@@ -186,8 +186,10 @@ app.get("/transactions", (req, res) => {
                 <table>
                     <tr>
                         <th>ID</th>
-                        <th>Account ID</th>
+                        <th>Account NR</th>
                         <th>Amount</th>
+                        <th>Description</th>
+                        <th>Transaction Type</th>
                         <th>Date</th>
                     </tr>
                     ${transactions
@@ -195,8 +197,10 @@ app.get("/transactions", (req, res) => {
                         (t) => `
                         <tr>
                             <td>${t.id}</td>
-                            <td>${t.accountId}</td>
-                            <td>${t.amount}</td>
+                            <td>${t.BankNumber}</td>
+                            <td>${t.Amount}</td>
+                            <td>${t.Description}</td>
+                            <td>${t.TransactionType}</td>
                             <td>${t.date}</td>
                         </tr>`
                       )
@@ -210,26 +214,29 @@ app.get("/transactions", (req, res) => {
 app.post("/transaction", (req, res) => {
   try {
     const validated = TransactionValidation.parse(req.body);
-    if (!BankNumber || !Amount) {
+    const { BankNumber, Amount } = validated;
+    if (!BankNumber || Amount === undefined) {
       return res
         .status(400)
-        .send({ message: "Account ID and amount are required!" });
+        .send({ message: "Account number and amount are required!" });
     }
+    //console.log("Received Transaction Data:", validated);
     const account = BankoSaskaitos.find((s) => s.BankNumber === BankNumber);
+    //console.log("Account found:", account);
     if (!account) {
       return res.status(404).send({ message: "Account not found!" });
     }
-    BankoSaskaitos[account.id].Funds =
-      Number(BankoSaskaitos[account.id].Funds) + Number(validated.Amount);
+    account.Funds = Number(account.Funds) + Number(Amount);
     usage.user.success++;
-    transactions.push({
+    const transaction = {
       id: transactionid,
       BankNumber: validated.BankNumber,
       Amount: validated.Amount,
       Description: validated.Description,
       TransactionType: validated.TransactionType,
       date: new Date().toLocaleString("lt-LT"),
-    });
+    };
+    transactions.push(transaction);
     transactionid++;
     return res.send({
       message: "Transaction created successfully!",
@@ -237,8 +244,8 @@ app.post("/transaction", (req, res) => {
     });
   } catch (error) {
     return res
-      .status(500)
-      .send({ message: "Transaction creation failed!", error });
+      .status(400)
+      .send({ message: "Transaction creation failed!", errors: error.issues });
   }
 });
 app.listen(3000, () => {
