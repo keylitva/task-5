@@ -1,7 +1,7 @@
 import express from "express";
 import * as z from "zod";
 import { BankValidation } from "./validations.js";
-import { id } from "zod/locales";
+import { BankAccountNameValidation } from "./validations.js";
 
 const app = express();
 
@@ -77,6 +77,7 @@ app.get("/account-info", (req, res) => {
                           <th>Savininkas</th>
                           <th>Likutis</th>
                           <th>Sukurtas</th>
+                          <th>Atnaujinta</th>
                       </tr>
                       ${BankoSaskaitos.map(
                         (s) => `
@@ -86,6 +87,7 @@ app.get("/account-info", (req, res) => {
                             <td>${s.AccountName || ""}</td>
                             <td>${s.Funds || ""}</td>
                             <td>${s.createdAt || ""}</td>
+                            <td>${s.updatedAt || "No updates"}</td>
                           </tr>
                       `
                       ).join("")}
@@ -103,19 +105,18 @@ app.get("/account-info", (req, res) => {
       `);
   res.end();
 });
-
 app.post("/createbankaccount", (req, res) => {
   try {
     console.log("Received Bank Account Data:", req.body);
     const validated = BankValidation.parse(req.body);
-    console.log("Validated Bank Account:", validated);
+    //console.log("Validated Bank Account:", validated);
     usage.user.creates++;
     usage.user.success++;
     validated.createdAt = new Date().toLocaleString("lt-LT");
     validated.id = accountid++;
-    console.log("Adding Bank Account:", validated);
+    //console.log("Adding Bank Account:", validated);
     BankoSaskaitos.push(validated);
-    console.log("Current Bank Accounts:", BankoSaskaitos);
+    //console.log("Current Bank Accounts:", BankoSaskaitos);
     res.send({ message: "Created user successfully!" });
   } catch (error) {
     usage.user.fail++;
@@ -124,7 +125,6 @@ app.post("/createbankaccount", (req, res) => {
       .send({ message: "Invalid Bank data!", error: error.issues });
   }
 });
-
 app.delete("/deletebankaccount/:id", (req, res) => {
   try {
     const accountIndex = BankoSaskaitos.findIndex(
@@ -143,7 +143,28 @@ app.delete("/deletebankaccount/:id", (req, res) => {
       .send({ message: "Account deletion failed!", error: error });
   }
 });
-
+app.put("/change/:id", (req, res) => {
+  const accountIndex = BankoSaskaitos.findIndex(
+    (s) => s.id === Number(req.params.id)
+  );
+  if (accountIndex === -1) {
+    usage.user.fail++;
+    return res.status(404).send({ message: "Account not found!" });
+  }
+  try {
+    const validated = BankAccountNameValidation.parse(req.body);
+    usage.user.change++;
+    Object.assign(BankoSaskaitos[accountIndex], validated);
+    BankoSaskaitos[accountIndex].updatedAt = new Date().toLocaleString("lt-LT");
+    usage.user.success++;
+    return res.send({ message: "Account updated successfully!" });
+  } catch (error) {
+    usage.user.fail++;
+    return res
+      .status(400)
+      .send({ message: "Invalid Bank data!", error: error.issues });
+  }
+});
 app.listen(3000, () => {
   console.log("The create user api has started on port 3000!");
 });

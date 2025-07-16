@@ -23,3 +23,12 @@ export const BankValidation = z.object({
       message: "Likutis turi būti teigiamas arba neigiamas sveikasis skaičius.",
     }),
 });
+
+export const BankAccountNameValidation = z.object({
+  AccountName: z
+    .string()
+    .trim()
+    .regex(/^[A-Z][a-z]+ [A-Z][a-z]+$/, {
+      message: "Sąskaitos savininko vardas ir pavardė turi būti teisingi.",
+    }),
+});
