@@ -2,6 +2,7 @@ import express from "express";
 import * as z from "zod";
 import { BankValidation } from "./validations.js";
 import { BankAccountNameValidation } from "./validations.js";
+import { TransactionValidation } from "./validations.js";
 
 const app = express();
 
@@ -9,6 +10,8 @@ app.use(express.json());
 
 const BankoSaskaitos = [];
 let accountid = 0;
+const transactions = [];
+let transactionid = 0;
 
 const usage = {
   user: { gets: 0, creates: 0, success: 0, fail: 0, delete: 0, change: 0 },
@@ -163,6 +166,79 @@ app.put("/change/:id", (req, res) => {
     return res
       .status(400)
       .send({ message: "Invalid Bank data!", error: error.issues });
+  }
+});
+app.get("/transactions", (req, res) => {
+  res.setHeader("Content-Type", "text/html");
+  res.send(`
+        <html>
+            <head>
+                <title>Transactions</title>
+                <style>
+                    body { font-family: sans-serif; margin: 1em; }
+                    table { border-collapse: collapse; width: 100%; }
+                    th, td { border: 1px solid #ccc; padding: 2px; }
+                    th { background: #eee; }
+                </style>
+            </head>
+            <body>
+                <h4>Transactions</h4>
+                <table>
+                    <tr>
+                        <th>ID</th>
+                        <th>Account ID</th>
+                        <th>Amount</th>
+                        <th>Date</th>
+                    </tr>
+                    ${transactions
+                      .map(
+                        (t) => `
+                        <tr>
+                            <td>${t.id}</td>
+                            <td>${t.accountId}</td>
+                            <td>${t.amount}</td>
+                            <td>${t.date}</td>
+                        </tr>`
+                      )
+                      .join("")}
+                </table>
+            </body>
+        </html>
+    `);
+  res.end();
+});
+app.post("/transaction", (req, res) => {
+  try {
+    const validated = TransactionValidation.parse(req.body);
+    if (!BankNumber || !Amount) {
+      return res
+        .status(400)
+        .send({ message: "Account ID and amount are required!" });
+    }
+    const account = BankoSaskaitos.find((s) => s.BankNumber === BankNumber);
+    if (!account) {
+      return res.status(404).send({ message: "Account not found!" });
+    }
+    BankoSaskaitos[account.id].Funds =
+      Number(BankoSaskaitos[account.id].Funds) + Number(validated.Amount);
+    usage.user.success++;
+    transactions.push({
+      id: transactionid,
+      BankNumber: validated.BankNumber,
+      Amount: validated.Amount,
+      Description: validated.Description,
+      TransactionType: validated.TransactionType,
+      date: new Date().toLocaleString("lt-LT"),
+    });
+    transactionid++;
+    return res.send({
+      message: "Transaction created successfully!",
+      transaction,
+    });
+  } catch (error) {
+    return res
+      .status(500)
+      .send({ message: "Transaction creation failed!", error });
   }
 });
 app.listen(3000, () => {
