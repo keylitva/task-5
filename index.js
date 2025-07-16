@@ -3,21 +3,22 @@ import * as z from "zod";
 import { BankValidation } from "./validations.js";
 import { BankAccountNameValidation } from "./validations.js";
 import { TransactionValidation } from "./validations.js";
+import { Transactions } from "./classes/transaction-class.js";
+import { BankAccount } from "./classes/bank-account-class.js";
 
 const app = express();
 
 app.use(express.json());
 
-const BankoSaskaitos = [];
-let accountid = 0;
-const transactions = [];
-let transactionid = 0;
+export const bc = new BankAccount();
+const tx = new Transactions();
 
 const usage = {
   user: { gets: 0, creates: 0, success: 0, fail: 0, delete: 0, change: 0 },
 };
 
 app.get("/available-funds/:id", (req, res) => {
+  const BankoSaskaitos = bc.getAccountsInfo();
   usage.user.gets++;
   const account = BankoSaskaitos.find((s) => s.id === Number(req.params.id));
   res.setHeader("Content-Type", "text/html");
@@ -57,6 +58,7 @@ app.get("/available-funds/:id", (req, res) => {
   res.end();
 });
 app.get("/account-info", (req, res) => {
+  const BankoSaskaitos = bc.getAccountsInfo();
   usage.user.gets++;
   res.setHeader("Content-Type", "text/html");
   res.send(`
@@ -110,16 +112,11 @@ app.get("/account-info", (req, res) => {
 });
 app.post("/createbankaccount", (req, res) => {
   try {
-    console.log("Received Bank Account Data:", req.body);
     const validated = BankValidation.parse(req.body);
-    //console.log("Validated Bank Account:", validated);
+    bc.createAccount(validated);
     usage.user.creates++;
     usage.user.success++;
-    validated.createdAt = new Date().toLocaleString("lt-LT");
-    validated.id = accountid++;
-    //console.log("Adding Bank Account:", validated);
-    BankoSaskaitos.push(validated);
-    //console.log("Current Bank Accounts:", BankoSaskaitos);
+    //console.log(bc.getAccountsInfo());
     res.send({ message: "Created user successfully!" });
   } catch (error) {
     usage.user.fail++;
@@ -130,16 +127,9 @@ app.post("/createbankaccount", (req, res) => {
 });
 app.delete("/deletebankaccount/:id", (req, res) => {
   try {
-    const accountIndex = BankoSaskaitos.findIndex(
-      (s) => s.id === Number(req.params.id)
-    );
-    if (accountIndex === -1) {
-      usage.user.fail++;
-      return res.status(404).send({ message: "Account not found!" });
-    }
-    BankoSaskaitos.splice(accountIndex, 1);
+    const banknr = bc.accountdelete(req.params.id);
+    return res.send(tx.deleteallTransactionsByBankNr(banknr));
     usage.user.delete++;
-    return res.send({ message: "Account deleted successfully!" });
   } catch (error) {
     return res
       .status(404)
@@ -147,20 +137,13 @@ app.delete("/deletebankaccount/:id", (req, res) => {
   }
 });
 app.put("/change/:id", (req, res) => {
-  const accountIndex = BankoSaskaitos.findIndex(
-    (s) => s.id === Number(req.params.id)
-  );
-  if (accountIndex === -1) {
-    usage.user.fail++;
-    return res.status(404).send({ message: "Account not found!" });
-  }
+  req.params.id;
+
   try {
     const validated = BankAccountNameValidation.parse(req.body);
+    return res.send(bc.updateAccountName(validated.AccountName, req.params.id));
     usage.user.change++;
-    Object.assign(BankoSaskaitos[accountIndex], validated);
-    BankoSaskaitos[accountIndex].updatedAt = new Date().toLocaleString("lt-LT");
     usage.user.success++;
-    return res.send({ message: "Account updated successfully!" });
   } catch (error) {
     usage.user.fail++;
     return res
@@ -169,6 +152,7 @@ app.put("/change/:id", (req, res) => {
   }
 });
 app.get("/transactions", (req, res) => {
+  const alltransactions = tx.getransactions();
   res.setHeader("Content-Type", "text/html");
   res.send(`
         <html>
@@ -192,7 +176,7 @@ app.get("/transactions", (req, res) => {
                         <th>Transaction Type</th>
                         <th>Date</th>
                     </tr>
-                    ${transactions
+                    ${alltransactions
                       .map(
                         (t) => `
                         <tr>
@@ -214,34 +198,12 @@ app.get("/transactions", (req, res) => {
 app.post("/transaction", (req, res) => {
   try {
     const validated = TransactionValidation.parse(req.body);
-    const { BankNumber, Amount } = validated;
-    if (!BankNumber || Amount === undefined) {
-      return res
-        .status(400)
-        .send({ message: "Account number and amount are required!" });
-    }
-    //console.log("Received Transaction Data:", validated);
-    const account = BankoSaskaitos.find((s) => s.BankNumber === BankNumber);
-    //console.log("Account found:", account);
-    if (!account) {
-      return res.status(404).send({ message: "Account not found!" });
-    }
-    account.Funds = Number(account.Funds) + Number(Amount);
-    usage.user.success++;
-    const transaction = {
-      id: transactionid,
-      BankNumber: validated.BankNumber,
-      Amount: validated.Amount,
-      Description: validated.Description,
-      TransactionType: validated.TransactionType,
-      date: new Date().toLocaleString("lt-LT"),
-    };
-    transactions.push(transaction);
-    transactionid++;
-    return res.send({
+    const transaction = tx.createTransaction(validated);
+    res.send({
       message: "Transaction created successfully!",
       transaction,
     });
+    usage.user.success++;
   } catch (error) {
     return res
       .status(400)
