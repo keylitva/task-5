@@ -116,7 +116,6 @@ app.post("/createbankaccount", (req, res) => {
     bc.createAccount(validated);
     usage.user.creates++;
     usage.user.success++;
-    //console.log(bc.getAccountsInfo());
     res.send({ message: "Created user successfully!" });
   } catch (error) {
     usage.user.fail++;
@@ -137,8 +136,6 @@ app.delete("/deletebankaccount/:id", (req, res) => {
   }
 });
 app.put("/change/:id", (req, res) => {
-  req.params.id;
-
   try {
     const validated = BankAccountNameValidation.parse(req.body);
     return res.send(bc.updateAccountName(validated.AccountName, req.params.id));
